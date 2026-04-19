@@ -378,7 +378,7 @@ import {
   Briefcase, DollarSign, Ticket as TicketIcon, Users, Clock, AlertTriangle, 
   Table as TableIcon, Filter, CheckCircle2, CalendarDays, UserCheck, XCircle, History
 } from "lucide-react";
-import { format, subDays, isAfter } from "date-fns";
+import { format, subDays, isAfter, differenceInCalendarDays, startOfDay } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -443,16 +443,10 @@ export default function AdminDashboard() {
   const recent60Updates = updates.filter(u => isAfter(new Date(u.date), sixtyDaysAgo));
 
   const longTermAttendance = employees.map(emp => {
-    // Get all updates for this employee in the last 60 days
     const empUpdates = recent60Updates.filter(u => u.employee_id === emp.id);
-    
-    // Calculate unique days they submitted an update
     const uniqueDays = new Set(empUpdates.map(u => u.date.slice(0, 10)));
-    
-    // Find the latest check-in date
     const latestUpdate = empUpdates.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
     
-    // Generate a 7-day visual pattern (from 6 days ago to today)
     const sevenDayPattern = Array.from({ length: 7 }).map((_, i) => {
       const d = format(subDays(new Date(), 6 - i), "yyyy-MM-dd");
       return { date: d, present: uniqueDays.has(d) };
@@ -468,6 +462,46 @@ export default function AdminDashboard() {
       hasAttendedToday: attendedEmployeeIds.has(emp.id)
     };
   }).sort((a, b) => a.name.localeCompare(b.name));
+
+  // --- SALARY REMINDER LOGIC ---
+  const todayAtStart = startOfDay(new Date());
+
+  const salaryReminders = useMemo(() => {
+    return employees.map((emp) => {
+      if (!emp.date_of_joining) return null;
+      
+      const doj = new Date(emp.date_of_joining);
+      // If joining date is in the future, skip
+      if (todayAtStart.getTime() < startOfDay(doj).getTime()) return null;
+
+      const dojDay = doj.getDate();
+      
+      // Calculate this month's and last month's cycle dates to handle rolling over months
+      const thisMonthAnniv = new Date(todayAtStart.getFullYear(), todayAtStart.getMonth(), dojDay);
+      const lastMonthAnniv = new Date(todayAtStart.getFullYear(), todayAtStart.getMonth() - 1, dojDay);
+
+      let diff = differenceInCalendarDays(todayAtStart, thisMonthAnniv);
+      let targetAnniv = thisMonthAnniv;
+
+      // If the difference is outside the 0-7 day window, check last month's cycle
+      if (diff < 0 || diff > 7) {
+        diff = differenceInCalendarDays(todayAtStart, lastMonthAnniv);
+        targetAnniv = lastMonthAnniv;
+      }
+
+      // If we are currently within the 7-day payment window
+      if (diff >= 0 && diff <= 7) {
+        return {
+          id: emp.id,
+          name: emp.full_name,
+          role: emp.role,
+          dueDate: targetAnniv,
+          daysSince: diff,
+        };
+      }
+      return null;
+    }).filter(Boolean).sort((a: any, b: any) => b.daysSince - a.daysSince); // Sort so oldest due dates are top
+  }, [employees, todayAtStart]);
 
   // Combine recent updates and tickets into a single unified activity feed
   const feed = [
@@ -578,8 +612,40 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* --- RIGHT COLUMN (Attendance & Projects) --- */}
+        {/* --- RIGHT COLUMN (Salary, Attendance & Projects) --- */}
         <div className="space-y-6">
+          
+          {/* SALARY REMINDERS (Only displays if active windows exist) */}
+          {salaryReminders.length > 0 && (
+            <Card className="shadow-sm h-fit border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20">
+              <CardHeader className="pb-3 border-b border-red-100 dark:border-red-900/50 bg-red-100/50 dark:bg-red-900/30">
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-red-700 dark:text-red-400">
+                  <DollarSign className="w-4 h-4" /> Pending Salary Credits
+                </CardTitle>
+                <CardDescription className="text-red-600/70 dark:text-red-400/70 text-xs">
+                  Active 1-week payment window based on DOJ.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-red-100 dark:divide-red-900/50 max-h-[300px] overflow-y-auto">
+                  {salaryReminders.map((rem: any) => (
+                    <div key={rem.id} className="flex items-center justify-between gap-2 px-4 py-3 hover:bg-red-100/30 dark:hover:bg-red-900/30 transition-colors">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-semibold truncate text-red-900 dark:text-red-300">{rem.name}</span>
+                        <span className="text-[11px] text-red-700/80 dark:text-red-400/80 truncate">Due since {format(rem.dueDate, "MMM d")}</span>
+                      </div>
+                      <div className="shrink-0">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-red-700 bg-red-200 dark:bg-red-900/60 dark:text-red-300 px-2 py-1 rounded">
+                          Day {rem.daysSince + 1} of 7
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* TODAY'S ATTENDANCE */}
           <Card className="shadow-sm h-fit">
             <CardHeader className="pb-3 border-b bg-muted/10">
