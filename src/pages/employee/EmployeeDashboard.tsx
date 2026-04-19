@@ -14,6 +14,7 @@
 //   useProjects,
 //   useSubmitDailyUpdate,
 //   useTickets,
+//   useDailyUpdates,
 // } from "@/hooks/useStaffArcData";
 // import { Button } from "@/components/ui/button";
 // import { Textarea } from "@/components/ui/textarea";
@@ -31,14 +32,18 @@
 //   CalendarDays,
 //   AlertTriangle,
 //   Ticket as TicketIcon,
+//   History,
+//   CheckCircle2,
+//   Clock,
 // } from "lucide-react";
-// import { format } from "date-fns";
+// import { format, subDays, isAfter } from "date-fns";
 
 // export default function EmployeeDashboard() {
 //   const { user } = useAuth();
 //   const { data: assignments = [] } = useAssignments();
 //   const { data: projects = [] } = useProjects();
 //   const { data: tickets = [] } = useTickets();
+//   const { data: updates = [] } = useDailyUpdates();
 //   const submit = useSubmitDailyUpdate();
 
 //   const myAssignments = useMemo(
@@ -53,6 +58,17 @@
 //         .slice(0, 5),
 //     [tickets, user],
 //   );
+
+//   // Fetch the employee's updates from the last 7 days
+//   const myRecentUpdates = useMemo(() => {
+//     if (!user) return [];
+//     const sevenDaysAgo = subDays(new Date(), 7);
+    
+//     return updates
+//       .filter((u) => u.employee_id === user.id)
+//       .filter((u) => isAfter(new Date(u.date), sevenDaysAgo))
+//       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+//   }, [updates, user]);
 
 //   const projectName = (id: string) =>
 //     projects.find((p) => p.id === id)?.name ?? "—";
@@ -110,7 +126,7 @@
 //       </div>
 
 //       <div className="grid gap-6 lg:grid-cols-3">
-//         {/* Left Column: Projects and Tickets */}
+//         {/* Left Column: Projects, Tickets, and History */}
 //         <div className="space-y-6 lg:col-span-2">
           
 //           {/* --- Active Assignments --- */}
@@ -156,7 +172,6 @@
 //                         </div>
 //                       </div>
                       
-//                       {/* Badge wraps to next line on small mobile screens */}
 //                       <div className="self-start sm:self-auto shrink-0 pt-1 sm:pt-0">
 //                         <StatusBadge
 //                           label={`${a.completion_percentage}% Done`}
@@ -216,121 +231,207 @@
 //               )}
 //             </CardContent>
 //           </Card>
+
+//           {/* --- My Recent Updates (Read Only) --- */}
+//           <Card>
+//             <CardHeader className="pb-2 bg-muted/10 border-b">
+//               <CardTitle className="flex items-center gap-2 text-base font-semibold">
+//                 <History className="h-4 w-4 text-primary" /> 
+//                 My Recent Updates (Past 7 Days)
+//               </CardTitle>
+//             </CardHeader>
+//             <CardContent className="pt-4 space-y-4">
+//               {myRecentUpdates.length === 0 ? (
+//                 <div className="p-6 text-center text-sm text-muted-foreground border-2 border-dashed rounded-xl mx-1 sm:mx-0">
+//                   No daily updates submitted in the last 7 days.
+//                 </div>
+//               ) : (
+//                 <div className="space-y-4">
+//                   {myRecentUpdates.map((u: any) => (
+//                     <div 
+//                       key={u.id} 
+//                       className={`rounded-lg border p-4 text-sm ${u.has_blocker ? 'border-destructive/40 bg-destructive/5' : 'bg-card'}`}
+//                     >
+//                       <div className="flex items-center justify-between border-b pb-2 mb-3">
+//                         <div className="font-semibold text-foreground">{projectName(u.project_id)}</div>
+//                         <div className="text-xs text-muted-foreground font-medium bg-muted/50 px-2 py-1 rounded">
+//                           {format(new Date(u.date), "EEEE, MMM d")}
+//                         </div>
+//                       </div>
+                      
+//                       <div className="space-y-3">
+//                         {/* Completed Section */}
+//                         {(u.completed || u.completed_tasks) && (
+//                           <div>
+//                             <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 mb-1">
+//                               <CheckCircle2 className="w-3.5 h-3.5" /> Completed
+//                             </div>
+//                             <div className="text-muted-foreground text-[13px] whitespace-pre-wrap pl-5 border-l-2 border-green-200 dark:border-green-900 ml-1.5">
+//                               {u.completed || u.completed_tasks}
+//                             </div>
+//                           </div>
+//                         )}
+
+//                         {/* In Progress Section */}
+//                         {(u.in_progress || u.in_progress_tasks) && (
+//                           <div>
+//                             <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-500 mb-1">
+//                               <Clock className="w-3.5 h-3.5" /> In Progress
+//                             </div>
+//                             <div className="text-muted-foreground text-[13px] whitespace-pre-wrap pl-5 border-l-2 border-blue-200 dark:border-blue-900 ml-1.5">
+//                               {u.in_progress || u.in_progress_tasks}
+//                             </div>
+//                           </div>
+//                         )}
+
+//                         {/* Planned Section */}
+//                         {(u.planned || u.planned_tasks) && (
+//                           <div>
+//                             <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-500 mb-1">
+//                               <CalendarDays className="w-3.5 h-3.5" /> Planned for tomorrow
+//                             </div>
+//                             <div className="text-muted-foreground text-[13px] whitespace-pre-wrap pl-5 border-l-2 border-purple-200 dark:border-purple-900 ml-1.5">
+//                               {u.planned || u.planned_tasks}
+//                             </div>
+//                           </div>
+//                         )}
+
+//                         {/* Blocker Section */}
+//                         {u.has_blocker && (
+//                           <div className="mt-2 pt-2 border-t border-destructive/20">
+//                             <div className="flex items-center gap-1.5 text-xs font-bold text-destructive uppercase tracking-wider mb-1">
+//                               <AlertTriangle className="w-3.5 h-3.5" /> Blocker Logged
+//                             </div>
+//                             <div className="text-destructive/90 text-[13px] whitespace-pre-wrap pl-5 ml-1.5">
+//                               {u.blocker_description || "No description provided."}
+//                             </div>
+//                           </div>
+//                         )}
+//                       </div>
+//                     </div>
+//                   ))}
+//                 </div>
+//               )}
+//             </CardContent>
+//           </Card>
 //         </div>
 
 //         {/* Right Column: Daily Update Form */}
-//         <Card className="h-fit lg:sticky lg:top-20 shadow-md border-primary/20 flex flex-col">
-//           <CardHeader className="pb-3 bg-muted/20 border-b">
-//             <CardTitle className="text-base font-semibold">
-//               Submit Daily Update
-//             </CardTitle>
-//             <CardDescription className="text-xs mt-1">
-//               {format(new Date(), "EEEE, MMMM do, yyyy")}
-//             </CardDescription>
-//           </CardHeader>
-//           <CardContent className="pt-5">
-//             <form className="space-y-5" onSubmit={handleSubmit}>
-//               <div className="space-y-2">
-//                 <Label className="text-sm">
-//                   Project <span className="text-destructive">*</span>
-//                 </Label>
-//                 <Select value={projectId} onValueChange={setProjectId} required>
-//                   <SelectTrigger className="w-full">
-//                     <SelectValue placeholder="Select a project" />
-//                   </SelectTrigger>
-//                   <SelectContent>
-//                     {myAssignments.map((a) => (
-//                       <SelectItem key={a.id} value={a.project_id}>
-//                         {projectName(a.project_id)}
-//                       </SelectItem>
-//                     ))}
-//                   </SelectContent>
-//                 </Select>
-//               </div>
-
-//               <div className="space-y-2">
-//                 <Label className="text-sm">Completed today</Label>
-//                 <Textarea
-//                   rows={2}
-//                   className="resize-none"
-//                   value={completed}
-//                   onChange={(e) => setCompleted(e.target.value)}
-//                   placeholder="What did you ship?"
-//                 />
-//               </div>
-
-//               <div className="space-y-2">
-//                 <Label className="text-sm">In progress</Label>
-//                 <Textarea
-//                   rows={2}
-//                   className="resize-none"
-//                   value={inProgress}
-//                   onChange={(e) => setInProgress(e.target.value)}
-//                   placeholder="What are you working on right now?"
-//                 />
-//               </div>
-
-//               <div className="space-y-2">
-//                 <Label className="text-sm">Planned for tomorrow</Label>
-//                 <Textarea
-//                   rows={2}
-//                   className="resize-none"
-//                   value={planned}
-//                   onChange={(e) => setPlanned(e.target.value)}
-//                   placeholder="What's next on your plate?"
-//                 />
-//               </div>
-
-//               <div
-//                 className={`flex flex-row items-center justify-between rounded-lg border p-3.5 transition-colors ${
-//                   hasBlocker ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900" : "bg-transparent"
-//                 }`}
-//               >
-//                 <div className="flex items-center gap-2.5">
-//                   <AlertTriangle
-//                     className={`h-4 w-4 ${hasBlocker ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}
-//                   />
-//                   <Label
-//                     htmlFor="blk"
-//                     className={`cursor-pointer text-sm ${hasBlocker ? "text-red-900 dark:text-red-400 font-semibold" : ""}`}
-//                   >
-//                     I am blocked
+//         <div className="lg:col-span-1">
+//           <Card className="h-fit lg:sticky lg:top-20 shadow-md border-primary/20 flex flex-col">
+//             <CardHeader className="pb-3 bg-muted/20 border-b">
+//               <CardTitle className="text-base font-semibold">
+//                 Submit Daily Update
+//               </CardTitle>
+//               <CardDescription className="text-xs mt-1">
+//                 {format(new Date(), "EEEE, MMMM do, yyyy")}
+//               </CardDescription>
+//             </CardHeader>
+//             <CardContent className="pt-5">
+//               <form className="space-y-5" onSubmit={handleSubmit}>
+//                 <div className="space-y-2">
+//                   <Label className="text-sm">
+//                     Project <span className="text-destructive">*</span>
 //                   </Label>
+//                   <Select value={projectId} onValueChange={setProjectId} required>
+//                     <SelectTrigger className="w-full">
+//                       <SelectValue placeholder="Select a project" />
+//                     </SelectTrigger>
+//                     <SelectContent>
+//                       {myAssignments.map((a) => (
+//                         <SelectItem key={a.id} value={a.project_id}>
+//                           {projectName(a.project_id)}
+//                         </SelectItem>
+//                       ))}
+//                     </SelectContent>
+//                   </Select>
 //                 </div>
-//                 <Switch
-//                   id="blk"
-//                   checked={hasBlocker}
-//                   onCheckedChange={setHasBlocker}
-//                 />
-//               </div>
 
-//               {hasBlocker && (
-//                 <div className="animate-in fade-in slide-in-from-top-2 pt-1">
+//                 <div className="space-y-2">
+//                   <Label className="text-sm">Completed today</Label>
 //                   <Textarea
-//                     rows={3}
-//                     className="border-red-300 dark:border-red-800 focus-visible:ring-red-500 resize-none"
-//                     value={blocker}
-//                     onChange={(e) => setBlocker(e.target.value)}
-//                     placeholder="Describe the blocker so your lead can help..."
-//                     required
+//                     rows={2}
+//                     className="resize-none"
+//                     value={completed}
+//                     onChange={(e) => setCompleted(e.target.value)}
+//                     placeholder="What did you ship?"
 //                   />
 //                 </div>
-//               )}
 
-//               <Button
-//                 type="submit"
-//                 disabled={submit.isPending}
-//                 className="w-full mt-2 py-5 sm:py-2"
-//               >
-//                 {submit.isPending ? "Submitting..." : "Submit Update"}
-//               </Button>
-//             </form>
-//           </CardContent>
-//         </Card>
+//                 <div className="space-y-2">
+//                   <Label className="text-sm">In progress</Label>
+//                   <Textarea
+//                     rows={2}
+//                     className="resize-none"
+//                     value={inProgress}
+//                     onChange={(e) => setInProgress(e.target.value)}
+//                     placeholder="What are you working on right now?"
+//                   />
+//                 </div>
+
+//                 <div className="space-y-2">
+//                   <Label className="text-sm">Planned for tomorrow</Label>
+//                   <Textarea
+//                     rows={2}
+//                     className="resize-none"
+//                     value={planned}
+//                     onChange={(e) => setPlanned(e.target.value)}
+//                     placeholder="What's next on your plate?"
+//                   />
+//                 </div>
+
+//                 <div
+//                   className={`flex flex-row items-center justify-between rounded-lg border p-3.5 transition-colors ${
+//                     hasBlocker ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900" : "bg-transparent"
+//                   }`}
+//                 >
+//                   <div className="flex items-center gap-2.5">
+//                     <AlertTriangle
+//                       className={`h-4 w-4 ${hasBlocker ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}
+//                     />
+//                     <Label
+//                       htmlFor="blk"
+//                       className={`cursor-pointer text-sm ${hasBlocker ? "text-red-900 dark:text-red-400 font-semibold" : ""}`}
+//                     >
+//                       I am blocked
+//                     </Label>
+//                   </div>
+//                   <Switch
+//                     id="blk"
+//                     checked={hasBlocker}
+//                     onCheckedChange={setHasBlocker}
+//                   />
+//                 </div>
+
+//                 {hasBlocker && (
+//                   <div className="animate-in fade-in slide-in-from-top-2 pt-1">
+//                     <Textarea
+//                       rows={3}
+//                       className="border-red-300 dark:border-red-800 focus-visible:ring-red-500 resize-none"
+//                       value={blocker}
+//                       onChange={(e) => setBlocker(e.target.value)}
+//                       placeholder="Describe the blocker so your lead can help..."
+//                       required
+//                     />
+//                   </div>
+//                 )}
+
+//                 <Button
+//                   type="submit"
+//                   disabled={submit.isPending}
+//                   className="w-full mt-2 py-5 sm:py-2"
+//                 >
+//                   {submit.isPending ? "Submitting..." : "Submit Update"}
+//                 </Button>
+//               </form>
+//             </CardContent>
+//           </Card>
+//         </div>
 //       </div>
 //     </div>
 //   );
 // }
+
 import { useMemo, useState } from "react";
 import {
   Card,
@@ -351,6 +452,7 @@ import {
 } from "@/hooks/useStaffArcData";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -368,6 +470,7 @@ import {
   History,
   CheckCircle2,
   Clock,
+  Search,
 } from "lucide-react";
 import { format, subDays, isAfter } from "date-fns";
 
@@ -407,11 +510,29 @@ export default function EmployeeDashboard() {
     projects.find((p) => p.id === id)?.name ?? "—";
 
   const [projectId, setProjectId] = useState<string>("");
+  const [projectSearch, setProjectSearch] = useState<string>("");
   const [completed, setCompleted] = useState("");
   const [inProgress, setInProgress] = useState("");
   const [planned, setPlanned] = useState("");
   const [hasBlocker, setHasBlocker] = useState(false);
   const [blocker, setBlocker] = useState("");
+
+  // Filter for Eligible Projects (Not completed, and matches search query)
+  const eligibleAssignments = useMemo(() => {
+    return myAssignments.filter((a) => {
+      const p = projects.find((proj) => proj.id === a.project_id);
+      
+      // Do not allow updates for completed projects
+      if (p?.status === "Completed") return false;
+      
+      // Apply search query
+      if (projectSearch) {
+        return p?.name.toLowerCase().includes(projectSearch.toLowerCase());
+      }
+      
+      return true;
+    });
+  }, [myAssignments, projects, projectSearch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -668,14 +789,33 @@ export default function EmployeeDashboard() {
                   </Label>
                   <Select value={projectId} onValueChange={setProjectId} required>
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a project" />
+                      <SelectValue placeholder="Select an active project" />
                     </SelectTrigger>
                     <SelectContent>
-                      {myAssignments.map((a) => (
-                        <SelectItem key={a.id} value={a.project_id}>
-                          {projectName(a.project_id)}
-                        </SelectItem>
-                      ))}
+                      <div className="p-2 sticky top-0 bg-popover/95 backdrop-blur z-10 border-b mb-1">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search projects..."
+                            value={projectSearch}
+                            onChange={(e) => setProjectSearch(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()} // Prevents spacebar from closing dropdown
+                            className="pl-9 h-8 bg-background"
+                          />
+                        </div>
+                      </div>
+                      
+                      {eligibleAssignments.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-muted-foreground">
+                          {projectSearch ? "No matches found" : "No active assignments"}
+                        </div>
+                      ) : (
+                        eligibleAssignments.map((a) => (
+                          <SelectItem key={a.id} value={a.project_id}>
+                            {projectName(a.project_id)}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
